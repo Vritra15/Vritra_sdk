@@ -49,12 +49,12 @@
 
         <ImageView
             android:id="@+id/imgSampleOne"
-            android:layout_width="87dp"
+            android:layout_width="85dp"
             android:layout_height="80dp"
             android:adjustViewBounds="true"
             android:contentDescription="@null"
             android:scaleType="centerCrop"
-            android:src="@drawable/demo_img1" />
+            android:src="@drawable/traffic" />
 
         <ImageView
             android:id="@+id/imgSampleTwo"
@@ -65,7 +65,7 @@
             android:adjustViewBounds="true"
             android:contentDescription="@null"
             android:scaleType="centerCrop"
-            android:src="@drawable/demo_img2" />
+            android:src="@drawable/whitehouse" />
 
         <ImageView
             android:id="@+id/imgSampleThree"

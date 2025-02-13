@@ -1,2 +1,21 @@
+pluginManagement {
+    repositories {
+        gradlePluginPortal()
+        google()
+        mavenCentral()
+    }
+}
+plugins {
+    id("com.gradle.develocity") version "3.17.4" // Or your desired version
+}
+
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
 include ':app'
 rootProject.name = "MLKit Object Detection Codelab"
