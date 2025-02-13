@@ -35,6 +35,7 @@ import androidx.exifinterface.media.ExifInterface
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.objects.DetectedObject
 import com.google.mlkit.vision.objects.ObjectDetection
+import com.google.mlkit.vision.objects.ObjectDetector
 import com.google.mlkit.vision.objects.defaults.ObjectDetectorOptions
 import java.io.File
 import java.io.IOException
@@ -42,8 +43,22 @@ import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.math.max
 import kotlin.math.min
+import org.tensorflow.lite.support.image.TensorImage
+import com.google.mlkit.vision.objects.custom.CustomObjectDetectorOptions
+import com.google.mlkit.common.model.LocalModel
+import androidx.activity.result.contract.ActivityResultContracts
+import com.google.mlkit.vision.objects.defaults.PredefinedCategory
+
+data class DetectedObjectData(
+    val boundingBox: Rect,
+    val label: String,
+    val score: Int
+)
+
+
 
 class MainActivity : AppCompatActivity(), View.OnClickListener {
+
     companion object {
         const val TAG = "MLKit-ODT"
         const val REQUEST_IMAGE_CAPTURE: Int = 1
@@ -94,14 +109,19 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
                 }
             }
             R.id.imgSampleOne -> {
-                setViewAndDetect(getSampleImage(R.drawable.b398444122da83cb2a5d71c1c35a1ce6))
+                setViewAndDetect(getSampleImage(R.drawable.traffic))
             }
             R.id.imgSampleTwo -> {
-                setViewAndDetect(getSampleImage(R.drawable.demo_img2))
+                setViewAndDetect(getSampleImage(R.drawable.whitehouse))
             }
             R.id.imgSampleThree -> {
                 setViewAndDetect(getSampleImage(R.drawable.demo_img3))
             }
+        }
+    }
+    private val objectDetectionLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            // Handle the result
         }
     }
 
@@ -109,39 +129,51 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
      * ML Kit Object Detection function. We'll add ML Kit code here in the codelab.
      */
     private fun runObjectDetection(bitmap: Bitmap) {
-        val image = InputImage.fromBitmap(bitmap, 0)
+        val localModel = LocalModel.Builder()
+            .setAssetFilePath("yolov8.tflite") // Ensure this file is inside `assets/`
+            .build()
 
-        val options = ObjectDetectorOptions.Builder()
-            .setDetectorMode(ObjectDetectorOptions.SINGLE_IMAGE_MODE)
+        val options = CustomObjectDetectorOptions.Builder(localModel)
+            .setDetectorMode(CustomObjectDetectorOptions.SINGLE_IMAGE_MODE)
             .enableMultipleObjects()
             .enableClassification()
             .build()
-        val objectDetector = ObjectDetection.getClient(options)
 
-        objectDetector.process(image).addOnSuccessListener { results ->
-            debugPrint(results)
+        val model = ObjectDetection.getClient(options)
 
-            // Parse ML Kit's DetectedObject and create corresponding visualization data
-            val detectedObjects = results.map {
-                var text = "Unknown"
+        val image = InputImage.fromBitmap(bitmap, 0)
+        model.process(image)
+            .addOnSuccessListener { detectedObjects ->
+                val detectedObjectDataList = detectedObjects.mapNotNull { detectedObject ->
+                    val labels = detectedObject.labels ?: return@mapNotNull null
 
-                // We will show the top confident detection result if it exist
-                if (it.labels.isNotEmpty()) {
-                    val firstLabel = it.labels.first()
-                    text = "${firstLabel.text}, ${firstLabel.confidence.times(100).toInt()}%"
+                    if (labels.isNotEmpty()) {
+                        val firstLabel = labels.first()
+                        val labelText = firstLabel.text //: "Unknown"
+                        val score = (firstLabel.confidence * 100).toInt()
+
+                        DetectedObjectData(detectedObject.boundingBox, labelText, score)
+                    } else {
+                        null
+                    }
                 }
-                BoxWithText(it.boundingBox, text)
+
+                detectedObjectDataList.forEach { detectedObjectData ->
+                    Log.d("DetectedObject", "Label: ${detectedObjectData.label}, Score: ${detectedObjectData.score}, BoundingBox: ${detectedObjectData.boundingBox}")
+                }
+
+                val detectionResults = detectedObjectDataList.map { // Transform to BoxWithText
+                    BoxWithText(it.boundingBox, "${it.label}, ${it.score}%")
+                }
+
+                val visualizedResult = drawDetectionResult(bitmap, detectionResults) // Use detectionResults
+                inputImageView.setImageBitmap(visualizedResult)
             }
-
-            // Draw the detection result on the input bitmap
-            val visualizedResult = drawDetectionResult(bitmap, detectedObjects)
-
-            // Show the detection result on the app screen
-            inputImageView.setImageBitmap(visualizedResult)
-        }.addOnFailureListener {
-            Log.e(TAG, it.message.toString())
-        }
+            .addOnFailureListener { e ->
+                Log.e("ObjectDetection", "Detection failed", e)
+            }
     }
+
 
     /**
      * Set image to view and call object detection
